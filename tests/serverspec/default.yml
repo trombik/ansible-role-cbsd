@@ -1,0 +1,6 @@
+---
+- hosts: localhost
+  roles:
+    - ansible-role-cbsd
+  vars:
+    cbsd_config: ""
