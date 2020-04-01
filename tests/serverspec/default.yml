@@ -1,6 +1,51 @@
 ---
 - hosts: localhost
+  pre_tasks:
   roles:
     - ansible-role-cbsd
   vars:
     cbsd_config: ""
+    cbsd_initenv_conf: |
+      # see /usr/local/cbsd/share/initenv.conf
+      nodename="auto"
+      nodeip="auto"
+      jnameserver="8.8.8.8 8.8.4.4"
+      nodeippool="10.0.0.0/24"
+      natip="auto"
+      nat_enable="pf"
+      mdtmp="8"
+      ipfw_enable="1"
+      zfsfeat="1"
+      hammerfeat="0"
+      fbsdrepo="1"
+      repo="http://bsdstore.ru"
+      workdir="{{ cbsd_workdir }}"
+      jail_interface="auto"
+      parallel="5"
+      stable="auto"
+      statsd_bhyve_enable="0"
+      statsd_jail_enable="0"
+      statsd_hoster_enable="0"
+      initenv_modify_sudoers="1"
+      initenv_modify_rcconf_hostname="1"
+      initenv_modify_rcconf_cbsd_workdir="1"
+      initenv_modify_rcconf_cbsd_enable="0"
+      initenv_modify_rcconf_rcshutdown_timeout="1"
+      initenv_modify_syctl_rcshutdown_timeout="1"
+      initenv_modify_rcconf_cbsdrsyncd_enable="1"
+      initenv_modify_rcconf_cbsdrsyncd_flags="1"
+      initenv_modify_cbsd_homedir="1"
+    cbsd_profiles:
+      - name: defaults/jail-freebsd-puppet.conf
+        state: absent
+      - name: defaults/jail-freebsd-myprofile.conf
+        config: |
+          # XXX must be "1" to enable the profile
+          jail_active="1"
+
+          jail_profile="myprofile"
+          emulator="jail"
+          default_jailname="j"
+          default_domain="i.trombik.org"
+          user_pw_root="password"
+          allow_raw_sockets="0"

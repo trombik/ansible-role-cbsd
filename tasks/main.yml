@@ -3,34 +3,72 @@
 
 - include_vars: "{{ ansible_os_family }}.yml"
 
+- name: Assert cbsd_profiles has valid elements
+  assert:
+    that:
+      - "'name' in item"
+  with_items: "{{ cbsd_profiles }}"
+
+- name: Assert items in cbsd_profiles have a valid `state` value
+  assert:
+    that:
+      - 'item.state == "absent" or item.state == "present"'
+  with_items: "{{ cbsd_profiles }}"
+  when:
+    - "'state' in item"
+
 - include: "install-{{ ansible_os_family }}.yml"
 
-- name: Create log directory
-  file:
-    path: "{{ cbsd_log_dir }}"
-    mode: 0755
-    owner: "{{ cbsd_user }}"
-    group: "{{ cbsd_group }}"
-    state: directory
-  notify: Restart cbsd
-
-- name: Create db directory
-  file:
-    path: "{{ cbsd_db_dir }}"
-    mode: 0755
-    owner: "{{ cbsd_user }}"
-    group: "{{ cbsd_group }}"
-    state: directory
-  notify: Restart cbsd
-
-- name: Create cbsd.conf
+- name: Create rc.conf.d/cbsdd
   template:
-    src: cbsd.conf.j2
-    dest: "{{ cbsd_conf_file }}"
-    validate: echo %s
-  notify: Restart cbsd
+    src: rc.cbsdd.j2
+    dest: "/etc/rc.conf.d/{{ cbsd_service }}"
+    validate: sh -n %s
 
-- name: Start cbsd
+- name: Create cbsd_workdir
+  file:
+    path: "{{ cbsd_workdir }}"
+    state: directory
+
+- name: Create cbsd_conf_dir
+  file:
+    path: "{{ cbsd_conf_dir }}"
+    state: directory
+
+- name: Create initenv.conf
+  template:
+    src: initenv.conf.j2
+    dest: "{{ cbsd_initenv_conf_file }}"
+
+- name: Run initenv in non-interactive mode
+  command:
+    cmd: "{{ cbsd_home }}/sudoexec/initenv {{ cbsd_initenv_conf_file }}"
+    creates: "{{ cbsd_workdir }}/nc.inventory"
+  environment:
+    workdir: "{{ cbsd_workdir }}"
+
+- name: Delete cbsd_profiles
+  file:
+    path: "{{ cbsd_workdir }}/etc/{{ item.name }}"
+    state: absent
+  with_items: "{{ cbsd_profiles }}"
+  when:
+    - "'state' in item"
+    - "item.state == 'absent'"
+
+- name: Create cbsd_profiles
+  template:
+    src: profile.j2
+    dest: "{{ cbsd_workdir }}/etc/{{ item.name }}"
+    mode: 0644
+    owner: "{{ cbsd_user }}"
+    group: "{{ cbsd_group }}"
+    validate: sh -n %s
+  with_items: "{{ cbsd_profiles }}"
+  when:
+    - "('state' in item and item.state == 'present') or not 'state' in item"
+
+- name: Start cbsd_service
   service:
     name: "{{ cbsd_service }}"
     enabled: true

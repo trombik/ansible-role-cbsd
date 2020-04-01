@@ -1,0 +1,45 @@
+--- cbsdd.orig	2020-04-01 00:33:12.486974000 +0000
++++ cbsdd	2020-04-01 00:57:23.959362000 +0000
+@@ -45,6 +45,7 @@
+ 
+ . ${localcbsdconf}
+ 
++start_cmd=${name}_start
+ start_precmd=${name}_prestart
+ stop_precmd=${name}_prestop
+ stop_cmd=${name}_stop
+@@ -72,7 +73,9 @@
+ cbsdd_prestop()
+ {
+ 	${rcddir}/jails-astart stop
+-	[ -n "${nat_enable}" ] && /usr/local/bin/cbsd natoff
++	if [ -n "${nat_enable}" ]; then
++		/usr/local/bin/cbsd natoff || echo "failed to cbsd natoff"
++	fi
+ }
+ 
+ cbsdd_stop()
+@@ -91,12 +94,8 @@
+ 
+ cbsdd_restart()
+ {
+-	if [ -f "${pidfile}" ]; then
+-		pkill -9 -f ${pidfile} > /dev/null 2>&1
+-		/bin/rm -f ${pidfile}
+-	fi
++	run_rc_command "stop"
+ 	run_rc_command "start"
+-	exit 0
+ }
+ 
+ cbsdd_status()
+@@ -118,4 +117,9 @@
+ 	fi
+ }
+ 
++cbsdd_start()
++{
++	echo "Starting ${name}"
++	/usr/sbin/daemon -c -S -T ${name} ${command}
++}
+ run_rc_command "$1"

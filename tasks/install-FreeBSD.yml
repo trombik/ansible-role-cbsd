@@ -4,3 +4,11 @@
   pkgng:
     name: cbsd
     state: present
+
+- name: Patch rc.d/cbsdd
+  patch:
+    # * do not terminate when `cbsdd natoff` fails. always stop the daemon
+    #   regardless
+    # * fix `restart`
+    dest: /usr/local/etc/rc.d/cbsdd
+    src: patch-cbsdd

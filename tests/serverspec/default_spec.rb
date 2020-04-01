@@ -1,58 +1,71 @@
 require "spec_helper"
-require "serverspec"
 
 package = "cbsd"
-service = "cbsd"
-config  = "/etc/cbsd/cbsd.conf"
-user    = "cbsd"
-group   = "cbsd"
-ports   = [PORTS]
-log_dir = "/var/log/cbsd"
-db_dir  = "/var/lib/cbsd"
-
-case os[:family]
-when "freebsd"
-  config = "/usr/local/etc/cbsd.conf"
-  db_dir = "/var/db/cbsd"
-end
+service = "cbsdd"
+workdir = "/usr/local/jails"
+confdir = "/usr/local/etc/cbsd"
+initenv_file = "#{confdir}/initenv.conf"
 
 describe package(package) do
   it { should be_installed }
 end
 
-describe file(config) do
+describe file("/etc/rc.conf.d/cbsdd") do
   it { should be_file }
-  its(:content) { should match Regexp.escape("cbsd") }
+  it { should be_mode 644 }
+  its(:content) { should match(/^cbsd_workdir="#{ Regexp.escape(workdir) }"$/) }
 end
 
-describe file(log_dir) do
-  it { should exist }
+describe file(confdir) do
+  it { should be_directory }
   it { should be_mode 755 }
-  it { should be_owned_by user }
-  it { should be_grouped_into group }
+  it { should be_owned_by "root" }
+  it { should be_grouped_into "wheel" }
 end
-
-describe file(db_dir) do
+describe file(initenv_file) do
   it { should exist }
-  it { should be_mode 755 }
-  it { should be_owned_by user }
-  it { should be_grouped_into group }
+  it { should be_file }
+  it { should be_mode 644 }
+  it { should be_owned_by "root" }
+  it { should be_grouped_into "wheel" }
+  its(:content) { should match(/^# Managed by ansible/) }
+  its(:content) { should match(/^nodename="auto"$/) }
 end
 
-case os[:family]
-when "freebsd"
-  describe file("/etc/rc.conf.d/cbsd") do
-    it { should be_file }
-  end
+describe file(workdir) do
+  it { should be_directory }
+  it { should be_mode 755 }
+  it { should be_owned_by "root" }
+  it { should be_grouped_into "wheel" }
 end
 
 describe service(service) do
-  it { should be_running }
   it { should be_enabled }
+  it { should be_running }
 end
 
-ports.each do |p|
-  describe port(p) do
-    it { should be_listening }
-  end
+describe command("env NOCOLOR=1 workdir='#{workdir}' cbsd jls") do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(/^$/) }
+  its(:stdout) { should match(/^JNAME\s+JID\s+IP4_ADDR\s+HOST_HOSTNAME\s+PATH\s+STATUS$/) }
+end
+
+describe command("env NOCOLOR=1 workdir='#{workdir}' cbsd -c 'cbsdsqlrw local \"SELECT 1\"'") do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(/^$/) }
+  its(:stdout) { should match(/^1$/) }
+end
+
+describe file "#{workdir}/etc/defaults/jail-freebsd-puppet.conf" do
+  it { should_not exist }
+end
+
+describe file "#{workdir}/etc/defaults/jail-freebsd-myprofile.conf" do
+  it { should exist }
+  it { should be_file }
+  it { should be_mode 644 }
+  it { should be_owned_by "cbsd" }
+  it { should be_grouped_into "cbsd" }
+  its(:content) { should match(/# Managed by ansible/) }
+  its(:content) { should match(/^jail_profile=/) }
 end
